@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import anime from 'animejs'; // Correct default import
+import anime from 'animejs';
 import { useRouter } from 'next/navigation';
 
 const Header = () => {
@@ -51,7 +51,7 @@ const Header = () => {
   }, []);
 
   const handleLoginClick = useCallback((role: 'User' | 'Admin') => {
-    router.push(role === 'User' ? '/user-dashboard' : '/admin-dashboard');
+    router.push(role === 'User' ? '/user' : '/admin');
     setShowLoginOptions(false);
   }, [router]);
 
