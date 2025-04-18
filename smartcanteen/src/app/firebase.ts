@@ -1,6 +1,7 @@
 // firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -24,4 +25,6 @@ const app = initializeApp(firebaseConfig);
 // Export Firestore instance
 const db = getFirestore(app);
 
-export { db };
+const auth = getAuth(app);
+
+export { db,auth };

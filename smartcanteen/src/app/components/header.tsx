@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import anime from 'animejs';
@@ -10,24 +10,26 @@ const Header = () => {
   const [showLoginOptions, setShowLoginOptions] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const router = useRouter();
 
-  // Close dropdown when clicking outside
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    setIsLoggedIn(!!token);
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowLoginOptions(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Animation effect
   useEffect(() => {
     setIsMounted(true);
-    
     if (headerRef.current) {
       headerRef.current.style.opacity = '0';
       headerRef.current.style.transform = 'translateY(-20px) scale(0.95)';
@@ -44,9 +46,7 @@ const Header = () => {
         delay: 300,
       });
 
-      return () => {
-        animation.pause();
-      };
+      return () => animation.pause();
     }
   }, []);
 
@@ -68,6 +68,12 @@ const Header = () => {
     router.push('/signup');
   }, [router]);
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setIsLoggedIn(false);
+    router.push('/');
+  };
+
   return (
     <header className="bg-gray-900 text-white p-4 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
       <h1
@@ -79,70 +85,64 @@ const Header = () => {
       </h1>
 
       <div className="flex gap-3">
-        {/* Login Dropdown */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            className="bg-gray-800 text-green-400 font-semibold px-6 py-2 rounded hover:bg-gray-700 transition-colors duration-200"
-            onClick={() => setShowLoginOptions(!showLoginOptions)}
-            aria-haspopup="true"
-            aria-expanded={showLoginOptions}
-            aria-label="Login options"
-          >
-            Login
-          </button>
-
-          {showLoginOptions && (
-            <div 
-              className="absolute right-0 mt-2 w-40 bg-gray-800 text-white rounded shadow-lg z-50 border border-gray-700"
-              role="menu"
-            >
+        {!isLoggedIn ? (
+          <>
+            <div className="relative" ref={dropdownRef}>
               <button
-                className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
-                onClick={() => handleLoginClick('User')}
-                role="menuitem"
+                className="bg-gray-800 text-green-400 font-semibold px-6 py-2 rounded hover:bg-gray-700 transition-colors duration-200"
+                onClick={() => setShowLoginOptions(!showLoginOptions)}
               >
-                User
+                Login
               </button>
-              <button
-                className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
-                onClick={() => handleLoginClick('Admin')}
-                role="menuitem"
-              >
-                Admin
-              </button>
+              {showLoginOptions && (
+                <div className="absolute right-0 mt-2 w-40 bg-gray-800 text-white rounded shadow-lg z-50 border border-gray-700">
+                  <button
+                    className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
+                    onClick={() => handleLoginClick('User')}
+                  >
+                    User
+                  </button>
+                  <button
+                    className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
+                    onClick={() => handleLoginClick('Admin')}
+                  >
+                    Admin
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Signup Button */}
-        <button
-          className="bg-gray-800 text-green-400 font-semibold px-6 py-2 rounded hover:bg-gray-700 transition-colors duration-200"
-          onClick={handleSignupClick}
-          aria-label="Sign up"
-        >
-          Signup
-        </button>
+            <button
+              className="bg-gray-800 text-green-400 font-semibold px-6 py-2 rounded hover:bg-gray-700 transition-colors duration-200"
+              onClick={handleSignupClick}
+            >
+              Signup
+            </button>
+          </>
+        ) : (
+          <button
+            className="bg-red-600 text-white font-semibold px-6 py-2 rounded hover:bg-red-700 transition-colors duration-200"
+            onClick={handleLogout}
+          >
+            Logout
+          </button>
+        )}
       </div>
 
-      {/* Signup Modal */}
       {showSignupModal && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
-          role="dialog"
-          aria-modal="true"
-        >
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-8 rounded-lg w-full max-w-md mx-4 text-gray-800 shadow-xl">
             <h2 className="text-2xl font-bold mb-4">Signup</h2>
             <p className="mb-6">Click below to complete your registration.</p>
             <div className="flex flex-col gap-3">
               <button
-                className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-colors duration-200 focus:ring-2 focus:ring-green-500 focus:outline-none"
+                className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
                 onClick={handleRegister}
               >
                 Go to Signup Page
               </button>
               <button
-                className="w-full bg-gray-600 text-white py-2 rounded hover:bg-gray-700 transition-colors duration-200 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+                className="w-full bg-gray-600 text-white py-2 rounded hover:bg-gray-700"
                 onClick={handleCloseSignupModal}
               >
                 Close
