@@ -73,7 +73,7 @@ export default function ItemsDisplay() {
             <tr>
               <th className="px-6 py-3">Item Name</th>
               <th className="px-6 py-3">Cost</th>
-              <th className="px-6 py-3">Quantity Sold</th>
+              {/* <th className="px-6 py-3">Quantity Sold</th> */}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700">
@@ -85,8 +85,8 @@ export default function ItemsDisplay() {
                 animate={{ opacity: 1 }}
               >
                 <td className="px-6 py-4">{item.Item}</td>
-                <td className="px-6 py-4">${item.Cost.toFixed(2)}</td>
-                <td className="px-6 py-4">{item.quantitysold}</td>
+                <td className="px-6 py-4">{item.Cost.toFixed(2)}</td>
+                {/* <td className="px-6 py-4">{item.quantitysold}</td> */}
               </motion.tr>
             ))}
           </tbody>
