@@ -1,15 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import anime from 'animejs';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { HiUserCircle } from 'react-icons/hi';  // Icon for user menu
 
 const Header = () => {
-  const headerRef = useRef<HTMLHeadingElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [showLoginOptions, setShowLoginOptions] = useState(false);
-  const [showSignupModal, setShowSignupModal] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const router = useRouter();
 
@@ -18,139 +14,82 @@ const Header = () => {
     setIsLoggedIn(!!token);
   }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowLoginOptions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    setIsMounted(true);
-    if (headerRef.current) {
-      headerRef.current.style.opacity = '0';
-      headerRef.current.style.transform = 'translateY(-20px) scale(0.95)';
-      headerRef.current.style.letterSpacing = '0.2em';
-
-      const animation = anime({
-        targets: headerRef.current,
-        opacity: [0, 1],
-        translateY: [-20, 0],
-        scale: [0.95, 1],
-        letterSpacing: ['0.2em', '0em'],
-        duration: 1200,
-        easing: 'easeOutElastic(1, .8)',
-        delay: 300,
-      });
-
-      return () => animation.pause();
-    }
-  }, []);
-
   const handleLoginClick = useCallback((role: 'User' | 'Admin') => {
     router.push(role === 'User' ? '/user' : '/admin');
-    setShowLoginOptions(false);
+    setShowMenu(false);
   }, [router]);
 
   const handleSignupClick = useCallback(() => {
-    setShowSignupModal(true);
-  }, []);
-
-  const handleCloseSignupModal = useCallback(() => {
-    setShowSignupModal(false);
-  }, []);
-
-  const handleRegister = useCallback(() => {
-    setShowSignupModal(false);
     router.push('/signup');
+    setShowMenu(false);
   }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     setIsLoggedIn(false);
     router.push('/');
+    setShowMenu(false);
   };
 
   return (
-    <header className="bg-gray-900 text-white p-4 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
-      <h1
-        ref={headerRef}
-        className="text-3xl font-extrabold text-center tracking-wide"
-        style={isMounted ? {} : { opacity: 0 }}
-      >
+    <header className="bg-gray-900 text-white p-4 shadow-md flex flex-col md:flex-row items-center justify-between gap-4 relative">
+      <h1 className="text-3xl font-extrabold text-center tracking-wide">
         Smart Canteen Management
       </h1>
 
-      <div className="flex gap-3">
-        {!isLoggedIn ? (
-          <>
-            <div className="relative" ref={dropdownRef}>
-              <button
-                className="bg-gray-800 text-green-400 font-semibold px-6 py-2 rounded hover:bg-gray-700 transition-colors duration-200"
-                onClick={() => setShowLoginOptions(!showLoginOptions)}
-              >
-                Login
-              </button>
-              {showLoginOptions && (
-                <div className="absolute right-0 mt-2 w-40 bg-gray-800 text-white rounded shadow-lg z-50 border border-gray-700">
-                  <button
-                    className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
-                    onClick={() => handleLoginClick('User')}
-                  >
-                    User
-                  </button>
-                  <button
-                    className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
-                    onClick={() => handleLoginClick('Admin')}
-                  >
-                    Admin
-                  </button>
-                </div>
-              )}
-            </div>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className="text-white p-2 rounded-full hover:bg-gray-700 transition-colors duration-200"
+        >
+          <HiUserCircle size={30} />
+        </button>
 
+        {showMenu && (
+          <div className="absolute top-12 right-0 w-48 bg-gray-800 text-white rounded shadow-lg z-50 border border-gray-700">
+            {/* Order History Button - Always visible */}
             <button
-              className="bg-gray-800 text-green-400 font-semibold px-6 py-2 rounded hover:bg-gray-700 transition-colors duration-200"
-              onClick={handleSignupClick}
+              className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
+              onClick={() => router.push('/history')}
             >
-              Signup
+              Order History
             </button>
-          </>
-        ) : (
-          <button
-            className="bg-red-600 text-white font-semibold px-6 py-2 rounded hover:bg-red-700 transition-colors duration-200"
-            onClick={handleLogout}
-          >
-            Logout
-          </button>
+
+            {/* Conditional Buttons */}
+            {!isLoggedIn ? (
+              <>
+                <button
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
+                  onClick={() => handleLoginClick('User')}
+                >
+                  Login as User
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
+                  onClick={() => handleLoginClick('Admin')}
+                >
+                  Login as Admin
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
+                  onClick={handleSignupClick}
+                >
+                  Signup
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="block w-full text-left px-4 py-2 hover:bg-gray-700 transition-colors duration-150"
+                  onClick={handleLogout}
+                >
+                  Logout
+                </button>
+              </>
+            )}
+          </div>
         )}
       </div>
-
-      {showSignupModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-8 rounded-lg w-full max-w-md mx-4 text-gray-800 shadow-xl">
-            <h2 className="text-2xl font-bold mb-4">Signup</h2>
-            <p className="mb-6">Click below to complete your registration.</p>
-            <div className="flex flex-col gap-3">
-              <button
-                className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
-                onClick={handleRegister}
-              >
-                Go to Signup Page
-              </button>
-              <button
-                className="w-full bg-gray-600 text-white py-2 rounded hover:bg-gray-700"
-                onClick={handleCloseSignupModal}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 };
