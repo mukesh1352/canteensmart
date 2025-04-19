@@ -22,7 +22,7 @@ interface FirestoreItem {
 
 export default function ItemsManagement() {
   const [items, setItems] = useState<FirestoreItem[]>([]);
-  const [loading, setLoading] = useState(false); // Manage loading state properly
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Omit<FirestoreItem, 'id' | 'quantitysold'>>({
     Item: '',
     Cost: 0,
@@ -30,10 +30,12 @@ export default function ItemsManagement() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<FirestoreItem | null>(null); // Store item to delete
+  const [itemToDelete, setItemToDelete] = useState<FirestoreItem | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<string>('items'); // Collection selection state
 
+  // Fetch data from Firestore based on selected collection
   useEffect(() => {
-    const itemsCollection = collection(db, 'items');
+    const itemsCollection = collection(db, selectedCollection);
     const unsubscribe = onSnapshot(itemsCollection, (snapshot) => {
       const itemsData = snapshot.docs.map((doc) => {
         const data = doc.data();
@@ -48,7 +50,7 @@ export default function ItemsManagement() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [selectedCollection]); // Run the effect when the collection changes
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -60,14 +62,14 @@ export default function ItemsManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true); // Set loading to true
+    setLoading(true);
 
     try {
       if (editingId) {
-        await updateDoc(doc(db, 'items', editingId), formData);
+        await updateDoc(doc(db, selectedCollection, editingId), formData);
         setEditingId(null);
       } else {
-        await addDoc(collection(db, 'items'), {
+        await addDoc(collection(db, selectedCollection), {
           ...formData,
           quantitysold: 0,
         });
@@ -77,7 +79,7 @@ export default function ItemsManagement() {
     } catch (error) {
       console.error('Error saving item: ', error);
     } finally {
-      setLoading(false); // Set loading to false after action is done
+      setLoading(false);
     }
   };
 
@@ -88,24 +90,24 @@ export default function ItemsManagement() {
   };
 
   const handleDeleteDialogOpen = (item: FirestoreItem) => {
-    setItemToDelete(item); // Set the item to delete
-    setDeleteDialogOpen(true); // Open delete confirmation dialog
+    setItemToDelete(item);
+    setDeleteDialogOpen(true);
   };
 
   const handleDelete = async () => {
     if (itemToDelete) {
-      setLoading(true); // Set loading to true during deletion
+      setLoading(true);
 
       try {
-        await deleteDoc(doc(db, 'items', itemToDelete.id));
+        await deleteDoc(doc(db, selectedCollection, itemToDelete.id));
       } catch (error) {
         console.error('Error deleting item: ', error);
       } finally {
-        setLoading(false); // Set loading to false after deletion
+        setLoading(false);
       }
     }
-    setDeleteDialogOpen(false); // Close the dialog after deletion
-    setItemToDelete(null); // Reset item to delete
+    setDeleteDialogOpen(false);
+    setItemToDelete(null);
   };
 
   return (
@@ -118,6 +120,20 @@ export default function ItemsManagement() {
       >
         🍽️ Items Management
       </motion.h1>
+
+      {/* Dropdown for Collection Selection */}
+      <div className="mb-6">
+        <label className="text-sm text-gray-300 mr-2">Select Collection: </label>
+        <select
+          value={selectedCollection}
+          onChange={(e) => setSelectedCollection(e.target.value)}
+          className="p-2 bg-gray-700 border border-gray-600 rounded-md text-white"
+        >
+          <option value="items">IT</option>
+          <option value="items1">MBA</option>
+          <option value="items2">MAIN</option>
+        </select>
+      </div>
 
       <div className="flex justify-end mb-6">
         <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -160,7 +176,7 @@ export default function ItemsManagement() {
                   <button
                     type="submit"
                     className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md shadow-sm"
-                    disabled={loading} // Disable button while loading
+                    disabled={loading}
                   >
                     {editingId ? 'Update Item' : 'Add Item'}
                   </button>
@@ -210,7 +226,7 @@ export default function ItemsManagement() {
                     onClick={() => handleEdit(item)}
                     className="p-2 rounded-md hover:bg-blue-600 text-blue-300 hover:text-white transition"
                     title="Edit"
-                    disabled={loading} // Disable button while loading
+                    disabled={loading}
                   >
                     <FaEdit />
                   </button>
@@ -218,7 +234,7 @@ export default function ItemsManagement() {
                     onClick={() => handleDeleteDialogOpen(item)}
                     className="p-2 rounded-md hover:bg-red-600 text-red-400 hover:text-white transition"
                     title="Delete"
-                    disabled={loading} // Disable button while loading
+                    disabled={loading}
                   >
                     <FaTrash />
                   </button>
@@ -242,7 +258,7 @@ export default function ItemsManagement() {
               <button
                 onClick={handleDelete}
                 className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-md"
-                disabled={loading} // Disable button while loading
+                disabled={loading}
               >
                 Yes, Delete
               </button>
