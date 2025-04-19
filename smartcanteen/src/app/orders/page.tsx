@@ -59,7 +59,7 @@ export default function OrdersPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        🛍️ Orders Page
+          🍽️ Orders Page
       </motion.h1>
 
       <div className="flex justify-center mb-6">
