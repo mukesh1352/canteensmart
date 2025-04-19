@@ -1,7 +1,17 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+} from 'firebase/firestore';
+import { motion } from 'framer-motion';
+import * as Dialog from '@radix-ui/react-dialog';
+import { FaEdit, FaTrash } from 'react-icons/fa';
 
 interface FirestoreItem {
   id: string;
@@ -12,27 +22,29 @@ interface FirestoreItem {
 
 export default function ItemsManagement() {
   const [items, setItems] = useState<FirestoreItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState<Omit<FirestoreItem, 'id' | 'quantitysold'>>({ 
-    Item: '', 
-    Cost: 0
+  const [loading, setLoading] = useState(false); // Manage loading state properly
+  const [formData, setFormData] = useState<Omit<FirestoreItem, 'id' | 'quantitysold'>>({
+    Item: '',
+    Cost: 0,
   });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<FirestoreItem | null>(null); // Store item to delete
 
   useEffect(() => {
     const itemsCollection = collection(db, 'items');
     const unsubscribe = onSnapshot(itemsCollection, (snapshot) => {
-      const itemsData = snapshot.docs.map(doc => {
+      const itemsData = snapshot.docs.map((doc) => {
         const data = doc.data();
         return {
           id: doc.id,
           Item: data.Item || '',
           Cost: data.Cost || 0,
-          quantitysold: data.quantitysold || 0
+          quantitysold: data.quantitysold || 0,
         };
       });
       setItems(itemsData);
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -40,158 +52,213 @@ export default function ItemsManagement() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: name === 'Item' ? value : Number(value)
+      [name]: name === 'Item' ? value : Number(value),
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setLoading(true); // Set loading to true
 
     try {
       if (editingId) {
-        // Update existing item (only Item and Cost)
         await updateDoc(doc(db, 'items', editingId), formData);
         setEditingId(null);
       } else {
-        // Add new item with quantitysold fixed at 0
         await addDoc(collection(db, 'items'), {
           ...formData,
-          quantitysold: 0 // Fixed value for new items
+          quantitysold: 0,
         });
       }
-      // Reset form
       setFormData({ Item: '', Cost: 0 });
+      setDialogOpen(false);
     } catch (error) {
-      console.error("Error saving item: ", error);
+      console.error('Error saving item: ', error);
     } finally {
-      setLoading(false);
+      setLoading(false); // Set loading to false after action is done
     }
   };
 
   const handleEdit = (item: FirestoreItem) => {
-    setFormData({
-      Item: item.Item,
-      Cost: item.Cost
-    });
+    setFormData({ Item: item.Item, Cost: item.Cost });
     setEditingId(item.id);
+    setDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this item?')) {
-      setLoading(true);
+  const handleDeleteDialogOpen = (item: FirestoreItem) => {
+    setItemToDelete(item); // Set the item to delete
+    setDeleteDialogOpen(true); // Open delete confirmation dialog
+  };
+
+  const handleDelete = async () => {
+    if (itemToDelete) {
+      setLoading(true); // Set loading to true during deletion
+
       try {
-        await deleteDoc(doc(db, 'items', id));
+        await deleteDoc(doc(db, 'items', itemToDelete.id));
       } catch (error) {
-        console.error("Error deleting item: ", error);
+        console.error('Error deleting item: ', error);
       } finally {
-        setLoading(false);
+        setLoading(false); // Set loading to false after deletion
       }
     }
+    setDeleteDialogOpen(false); // Close the dialog after deletion
+    setItemToDelete(null); // Reset item to delete
   };
 
-  if (loading && items.length === 0) {
-    return <div className="p-4">Loading items...</div>;
-  }
-
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Items Management</h1>
-      
-      {/* CRUD Form */}
-      <div className="mb-8 bg-gray-50 p-4 rounded-lg">
-        <h2 className="text-xl font-semibold mb-4">
-          {editingId ? 'Edit Item' : 'Add New Item'}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block mb-1 text-gray-700">Item Name</label>
-            <input
-              type="text"
-              name="Item"
-              value={formData.Item}
-              onChange={handleInputChange}
-              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"
-              required
-            />
-          </div>
-          <div>
-            <label className="block mb-1 text-gray-700">Cost</label>
-            <input
-              type="number"
-              name="Cost"
-              value={formData.Cost}
-              onChange={handleInputChange}
-              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800"
-              min="0"
-              step="0.01"
-              required
-            />
-          </div>
-          <div className="flex space-x-2">
-            <button
-              type="submit"
-              className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              disabled={loading}
-            >
-              {loading ? 'Saving...' : editingId ? 'Update Item' : 'Add Item'}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-gray-200 px-6 py-10">
+      <motion.h1
+        className="text-4xl font-extrabold text-center mb-10 text-white"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        🍽️ Items Management
+      </motion.h1>
+
+      <div className="flex justify-end mb-6">
+        <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog.Trigger asChild>
+            <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md text-white font-medium shadow-md transition">
+              + Add New Item
             </button>
-            {editingId && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingId(null);
-                  setFormData({ Item: '', Cost: 0 });
-                }}
-                className="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
+          </Dialog.Trigger>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
+            <Dialog.Content className="fixed z-50 top-[50%] left-[50%] -translate-x-[50%] -translate-y-[50%] bg-white text-black p-6 rounded-xl shadow-2xl w-[90vw] max-w-md">
+              <Dialog.Title className="text-2xl font-bold mb-4 text-center">
+                {editingId ? 'Edit Item' : 'Add New Item'}
+              </Dialog.Title>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Item Name</label>
+                  <input
+                    name="Item"
+                    value={formData.Item}
+                    onChange={handleInputChange}
+                    className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Cost</label>
+                  <input
+                    type="number"
+                    name="Cost"
+                    value={formData.Cost}
+                    onChange={handleInputChange}
+                    className="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+                <div className="flex justify-between mt-6">
+                  <button
+                    type="submit"
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md shadow-sm"
+                    disabled={loading} // Disable button while loading
+                  >
+                    {editingId ? 'Update Item' : 'Add Item'}
+                  </button>
+                  <Dialog.Close asChild>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(null);
+                        setFormData({ Item: '', Cost: 0 });
+                      }}
+                      className="bg-gray-200 hover:bg-gray-300 text-black px-4 py-2 rounded-md"
+                    >
+                      Cancel
+                    </button>
+                  </Dialog.Close>
+                </div>
+              </form>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
       </div>
 
-      {/* Items Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white border border-gray-200">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="py-2 px-4 border">Item Name</th>
-              <th className="py-2 px-4 border">Cost</th>
-              <th className="py-2 px-4 border">Quantity Sold</th>
-              <th className="py-2 px-4 border">Actions</th>
+      {/* Table */}
+      <div className="overflow-x-auto bg-gray-900 rounded-xl border border-gray-700 shadow-lg">
+        <table className="min-w-full table-auto">
+          <thead className="bg-gray-800 text-gray-100 text-left text-sm uppercase tracking-wide">
+            <tr>
+              <th className="px-6 py-3">Item Name</th>
+              <th className="px-6 py-3">Cost</th>
+              <th className="px-6 py-3">Quantity Sold</th>
+              <th className="px-6 py-3">Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {items.map(item => (
-              <tr key={item.id} className="hover:bg-gray-50">
-                <td className="py-2 px-4 border">
-                  {item.Item || <span className="text-red-500">Not specified</span>}
-                </td>
-                <td className="py-2 px-4 border">${item.Cost.toFixed(2)}</td>
-                <td className="py-2 px-4 border">{item.quantitysold}</td>
-                <td className="py-2 px-4 border">
+          <tbody className="divide-y divide-gray-700">
+            {items.map((item) => (
+              <motion.tr
+                key={item.id}
+                className="hover:bg-gray-800 transition-colors"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <td className="px-6 py-4">{item.Item}</td>
+                <td className="px-6 py-4">${item.Cost.toFixed(2)}</td>
+                <td className="px-6 py-4">{item.quantitysold}</td>
+                <td className="px-6 py-4 flex gap-2">
                   <button
                     onClick={() => handleEdit(item)}
-                    className="mr-2 text-blue-600 hover:text-blue-800"
+                    className="p-2 rounded-md hover:bg-blue-600 text-blue-300 hover:text-white transition"
+                    title="Edit"
+                    disabled={loading} // Disable button while loading
                   >
-                    Edit
+                    <FaEdit />
                   </button>
                   <button
-                    onClick={() => handleDelete(item.id)}
-                    className="text-red-600 hover:text-red-800"
+                    onClick={() => handleDeleteDialogOpen(item)}
+                    className="p-2 rounded-md hover:bg-red-600 text-red-400 hover:text-white transition"
+                    title="Delete"
+                    disabled={loading} // Disable button while loading
                   >
-                    Delete
+                    <FaTrash />
                   </button>
                 </td>
-              </tr>
+              </motion.tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Custom Delete Confirmation Dialog */}
+      <Dialog.Root open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
+          <Dialog.Content className="fixed z-50 top-[50%] left-[50%] -translate-x-[50%] -translate-y-[50%] bg-white text-black p-6 rounded-xl shadow-2xl w-[90vw] max-w-md">
+            <Dialog.Title className="text-xl font-bold text-center mb-4">
+              Confirm Deletion
+            </Dialog.Title>
+            <p className="text-center mb-6">Are you sure you want to delete this item?</p>
+            <div className="flex justify-between">
+              <button
+                onClick={handleDelete}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-md"
+                disabled={loading} // Disable button while loading
+              >
+                Yes, Delete
+              </button>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  onClick={() => setDeleteDialogOpen(false)}
+                  className="bg-gray-200 hover:bg-gray-300 text-black px-6 py-2 rounded-md"
+                >
+                  Cancel
+                </button>
+              </Dialog.Close>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }
