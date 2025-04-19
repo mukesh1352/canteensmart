@@ -160,7 +160,7 @@ export default function Page() {
 
         <div className="mt-6 text-center text-sm text-gray-400">
           Already have an account?{' '}
-          <a href="/login" className="text-cyan-400 hover:text-cyan-300 font-medium">
+          <a href="/user" className="text-cyan-400 hover:text-cyan-300 font-medium">
             Log in
           </a>
         </div>
