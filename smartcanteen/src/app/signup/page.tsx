@@ -90,8 +90,9 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 flex items-center justify-center p-4">
-      <div className="container max-w-md w-full p-8 bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-2xl border border-gray-700">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-900 flex items-center justify-center p-4 relative">
+      <div className="absolute inset-0 bg-black/80"></div> {/* Dark overlay */}
+      <div className="container max-w-md w-full p-8 bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-2xl border border-gray-700 relative">
         <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-6 text-center">
           Create Account
         </h2>
