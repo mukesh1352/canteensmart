@@ -2,16 +2,16 @@
 #include <WiFiClientSecure.h>
 #include <ThingSpeak.h>
 
-const char *ssid = "Vikas";
-const char *password = "12345678";
+#const char *ssid = "Vikas";
+#const char *password = "12345678";
 
 // Firebase settings
-const char *firebaseHost = "smartcanteen-28b15-default-rtdb.asia-southeast1.firebasedatabase.app";
-const char *firebaseAuth = "vDK0NaXbd8sPvv5IAErMlSQGZQaoLuI0tZmeoruW";
+#const char *firebaseHost = "smartcanteen-28b15-default-rtdb.asia-southeast1.firebasedatabase.app";
+#const char *firebaseAuth = "vDK0NaXbd8sPvv5IAErMlSQGZQaoLuI0tZmeoruW";
 
 // ThingSpeak settings
-const char *thingSpeakApiKey = "KCXAF67LAM23ZTIO";
-unsigned long channelID = 2896085;
+#const char *thingSpeakApiKey = "KCXAF67LAM23ZTIO";
+#unsigned long channelID = 2896085;
 
 const int waterSensorPin = 34;
 

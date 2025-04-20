@@ -5,8 +5,8 @@
 #include <FirebaseESP32.h>
 
 // Wi-Fi Credentials
-const char* ssid = "Vikas";
-const char* password = "12345678";
+#const char* ssid = "Vikas";
+#const char* password = "12345678";
 
 // Adafruit IO credentials
 #define AIO_SERVER      "io.adafruit.com"
