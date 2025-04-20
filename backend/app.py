@@ -38,7 +38,7 @@ This application predicts food demand based on historical sales data and provide
 @st.cache_data
 def load_data():
     try:
-        df = pd.read_csv('large_food_sales.csv', parse_dates=['Time/Date'])
+        df = pd.read_csv('1.csv', parse_dates=['Time/Date'])
     except FileNotFoundError:
         st.warning("Original file not found, using sample data...")
         data = {
