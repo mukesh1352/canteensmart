@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import SensorData from '../components/watersensor';
-import CanteenPage from '../components/canteen';
 import {
   collection,
   addDoc,
@@ -378,7 +377,6 @@ export default function ItemsManagement() {
         </Dialog.Portal>
       </Dialog.Root>
       <SensorData />
-      <CanteenPage />
     </div>
   );
 }

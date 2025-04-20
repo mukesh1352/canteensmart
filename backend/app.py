@@ -1,18 +1,17 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error
-from sklearn.preprocessing import LabelEncoder
-import holidays
-from datetime import datetime, timedelta
+import joblib
 import plotly.express as px
+from datetime import datetime, timedelta, time
+import holidays
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import LabelEncoder
+import calendar
 
 # Set page config
 st.set_page_config(
-    page_title="Food Demand Forecasting",
+    page_title="Smart Food Demand Forecast",
     page_icon="🍽️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -21,284 +20,225 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
-    .main {background-color: #f5f5f5;}
-    .reportview-container .main .block-container {padding-top: 2rem;}
-    .stDateInput {width: 200px;}
-    .stSelectbox {width: 300px;}
+    .main {
+        background-color: #f5f5f5;
+    }
+    .stButton>button {
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 5px;
+    }
+    .stSelectbox, .stDateInput, .stTimeInput {
+        background-color: white;
+    }
+    .metric-card {
+        background-color: white;
+        border-radius: 10px;
+        padding: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 15px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Title and description
-st.title("🍽️ Food Demand Forecasting")
-st.markdown("""
-This application predicts food demand based on historical sales data and provides recommendations.
-""")
-
-# Load data function (mock data if file not found)
-@st.cache_data
-def load_data():
+# Load data and models
+@st.cache_resource
+def load_assets():
     try:
+        # Load historical data (replace with your actual data loading)
         df = pd.read_csv('1.csv', parse_dates=['Time/Date'])
-    except FileNotFoundError:
-        st.warning("Original file not found, using sample data...")
-        data = {
-            'Item Name': ['Paneer Biryani', 'Aloo Paratha', 'Rajma Rice']*100,
-            'Quantity Sold': np.random.randint(1, 10, size=300),
-            'Time/Date': pd.date_range(start='2023-01-01', periods=300, freq='H')
+        
+        # Load trained model
+        model_data = joblib.load("food_demand_model.pkl")
+        
+        return {
+            'model': model_data['model'],
+            'item_encoder': model_data['item_encoder'],
+            'feature_processor': model_data['feature_processor'],
+            'historical_data': df
         }
-        df = pd.DataFrame(data)
-    return df
+    except Exception as e:
+        st.error(f"Error loading resources: {str(e)}")
+        return None
 
-# Preprocess data
-@st.cache_data
-def preprocess_data(df):
-    # Convert to datetime if not already
+assets = load_assets()
+if assets is None:
+    st.stop()
+
+model = assets['model']
+item_encoder = assets['item_encoder']
+feature_processor = assets['feature_processor']
+historical_data = assets['historical_data']
+
+# Preprocess historical data
+def preprocess_historical_data(df):
     df['Time/Date'] = pd.to_datetime(df['Time/Date'])
-
-    # Extract temporal features
     df['date'] = df['Time/Date'].dt.date
-    df['year'] = df['Time/Date'].dt.year
-    df['month'] = df['Time/Date'].dt.month
-    df['day'] = df['Time/Date'].dt.day
     df['day_of_week'] = df['Time/Date'].dt.dayofweek
     df['hour'] = df['Time/Date'].dt.hour
     df['is_weekend'] = (df['day_of_week'] >= 5).astype(int)
-    df['is_peak'] = ((df['hour'] >= 11) & (df['hour'] <= 14)) | ((df['hour'] >= 18) & (df['hour'] <= 21))
-    df['is_peak'] = df['is_peak'].astype(int)
+    df['month'] = df['Time/Date'].dt.month
+    df['item_code'] = item_encoder.transform(df['Item Name'])
+    return df
 
-    # Add holiday information (India as example)
-    in_holidays = holidays.India(years=df['Time/Date'].dt.year.unique())
-    df['is_holiday'] = df['Time/Date'].dt.date.apply(lambda x: x in in_holidays).astype(int)
+historical_data = preprocess_historical_data(historical_data)
 
-    # Encode item names
-    item_encoder = LabelEncoder()
-    df['item_code'] = item_encoder.fit_transform(df['Item Name'])
-    
-    return df, item_encoder
+# Sidebar inputs
+st.sidebar.header("📊 Prediction Parameters")
+selected_item = st.sidebar.selectbox("Menu Item", item_encoder.classes_)
+prediction_date = st.sidebar.date_input("Date", datetime.now())
+prediction_time = st.sidebar.time_input("Time", time(12, 0))
+forecast_days = st.sidebar.slider("Forecast Period (days)", 1, 30, 7)
 
-# Train model
-@st.cache_resource
-def train_model(daily_sales):
-    X = daily_sales[['Item Name', 'day_of_week', 'is_weekend', 'is_holiday', 'month', 'is_peak', 'rolling_3day']]
-    y = daily_sales['Quantity Sold']
-    X = pd.get_dummies(X, columns=['Item Name'])
-    
-    model = RandomForestRegressor(n_estimators=200, random_state=42)
-    model.fit(X, y)
-    return model, X.columns
+# Main app
+st.title("🍽️ Smart Food Demand Forecasting")
+st.markdown("Predict future demand and optimize your inventory planning")
 
-# Load and preprocess data
-df = load_data()
-df, item_encoder = preprocess_data(df)
-
-# Create daily sales aggregation
-daily_sales = df.groupby(['date', 'Item Name', 'day_of_week', 'is_weekend', 'is_holiday', 'month']).agg({
-    'Quantity Sold': 'sum',
-    'is_peak': 'mean'
-}).reset_index()
-
-# Add rolling features
-daily_sales['rolling_3day'] = daily_sales.groupby('Item Name')['Quantity Sold'].transform(
-    lambda x: x.rolling(3, min_periods=1).mean()
-)
-
-# Train model
-model, feature_columns = train_model(daily_sales)
-
-# Sidebar controls
-st.sidebar.header("Forecast Controls")
-prediction_date = st.sidebar.date_input(
-    "Select date for prediction",
-    min_value=datetime.now().date(),
-    value=datetime.now().date() + timedelta(days=1)
-)
-
-selected_items = st.sidebar.multiselect(
-    "Select items to forecast",
-    options=df['Item Name'].unique(),
-    default=df['Item Name'].unique()[:3]
-)
-
-# Main content tabs
-tab1, tab2, tab3, tab4 = st.tabs(["Forecast", "Historical Data", "Recommendations", "Anomaly Detection"])
+# Tab layout
+tab1, tab2, tab3 = st.tabs(["📈 Prediction", "📊 Historical Trends", "💡 Recommendations"])
 
 with tab1:
-    st.header("Demand Forecast")
+    # Current prediction
+    st.subheader("Instant Demand Prediction")
     
-    def predict_demand(date_to_predict, items):
-        if not items:
-            return pd.DataFrame()
+    def predict_demand(item, date, time):
+        india_holidays = holidays.India()
+        is_holiday = date in india_holidays
+        
+        input_data = {
+            'item_code': item_encoder.transform([item])[0],
+            'day_of_week': date.weekday(),
+            'is_weekend': int(date.weekday() >= 5),
+            'is_holiday': int(is_holiday),
+            'month': date.month,
+            'is_peak_hours': int((11 <= time.hour <= 14) or (18 <= time.hour <= 21)),
+            'is_morning': int(6 <= time.hour <= 10),
+            'is_late_night': int(time.hour <= 5 or time.hour >= 22)
+        }
+        
+        input_df = pd.DataFrame([input_data])
+        prediction = model.predict(input_df)[0]
+        return max(0, round(prediction))
+    
+    if st.button("Predict Now"):
+        with st.spinner('Calculating demand...'):
+            demand = predict_demand(selected_item, prediction_date, prediction_time)
             
-        day_of_week = date_to_predict.weekday()
-        is_weekend = 1 if day_of_week >= 5 else 0
-        is_holiday = 1 if date_to_predict in holidays.India() else 0
-        month = date_to_predict.month
-        is_peak = 0.5
-        
-        pred_data = []
-        for item in items:
-            item_data = daily_sales[daily_sales['Item Name'] == item]
-            rolling_3day = item_data['Quantity Sold'].tail(3).mean() if len(item_data) > 0 else 0
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Predicted Demand", f"{demand} units")
+            with col2:
+                st.metric("Day of Week", prediction_date.strftime("%A"))
+            with col3:
+                st.metric("Peak Hours", 
+                         "Yes" if (11 <= prediction_time.hour <= 14) or (18 <= prediction_time.hour <= 21) else "No")
             
-            features = {
-                'day_of_week': day_of_week,
-                'is_weekend': is_weekend,
-                'is_holiday': is_holiday,
-                'month': month,
-                'is_peak': is_peak,
-                'rolling_3day': rolling_3day
-            }
-            features.update({f'Item Name_{item}': 1})
-            pred_data.append(features)
-        
-        pred_df = pd.DataFrame(pred_data).fillna(0)
-        
-        for col in feature_columns:
-            if col not in pred_df.columns:
-                pred_df[col] = 0
-        
-        pred_df = pred_df[feature_columns]
-        pred_df['predicted_quantity'] = model.predict(pred_df)
-        pred_df['Item Name'] = items
-        
-        return pred_df[['Item Name', 'predicted_quantity']].sort_values('predicted_quantity', ascending=False)
-
-    if st.button("Generate Forecast"):
-        with st.spinner("Generating predictions..."):
-            predictions = predict_demand(prediction_date, selected_items)
+            # Forecast chart
+            st.subheader(f"{forecast_days}-Day Forecast")
+            forecast_dates = [prediction_date + timedelta(days=i) for i in range(forecast_days)]
+            forecast_data = []
             
-            if not predictions.empty:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.subheader("Top Items by Predicted Demand")
-                    st.dataframe(predictions.style.background_gradient(cmap='Blues'), 
-                                use_container_width=True)
-                
-                with col2:
-                    st.subheader("Visualization")
-                    fig = px.bar(predictions, 
-                                 x='Item Name', 
-                                 y='predicted_quantity',
-                                 color='predicted_quantity',
-                                 color_continuous_scale='Blues')
-                    st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.warning("Please select at least one item to forecast.")
+            for date in forecast_dates:
+                for hour in [8, 12, 15, 19]:  # Key meal times
+                    forecast_time = time(hour, 0)
+                    demand = predict_demand(selected_item, date, forecast_time)
+                    forecast_data.append({
+                        'Date': date,
+                        'Time': forecast_time,
+                        'Demand': demand,
+                        'Day': date.strftime("%A"),
+                        'Meal Time': "Breakfast" if hour == 8 else "Lunch" if hour == 12 else "Afternoon" if hour == 15 else "Dinner"
+                    })
+            
+            forecast_df = pd.DataFrame(forecast_data)
+            fig = px.line(forecast_df, x='Date', y='Demand', color='Meal Time',
+                          title=f"Demand Forecast for {selected_item}",
+                          labels={'Demand': 'Predicted Demand (units)'})
+            st.plotly_chart(fig, use_container_width=True)
 
 with tab2:
-    st.header("Historical Sales Data")
+    st.subheader("Historical Sales Trends")
     
-    # Date range selector
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input("Start date", 
-                                 value=df['date'].min(), 
-                                 min_value=df['date'].min(), 
-                                 max_value=df['date'].max())
-    with col2:
-        end_date = st.date_input("End date", 
-                               value=df['date'].max(), 
-                               min_value=df['date'].min(), 
-                               max_value=df['date'].max())
+    # Filter historical data for selected item
+    item_data = historical_data[historical_data['Item Name'] == selected_item].copy()
     
-    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
-    
-    if not filtered_df.empty:
-        # Sales by item
-        st.subheader("Sales by Item")
-        item_counts = filtered_df['Item Name'].value_counts().reset_index()
-        item_counts.columns = ['Item Name', 'Count']
-        fig = px.bar(item_counts, 
-                     x='Item Name', 
-                     y='Count', 
-                     color='Count',
-                     color_continuous_scale='Viridis')
+    if len(item_data) > 0:
+        # Time period selector
+        time_period = st.radio("View by:", ["Daily", "Weekly", "Monthly"], horizontal=True)
+        
+        if time_period == "Daily":
+            grouped = item_data.groupby('date')['Quantity Sold'].sum().reset_index()
+            fig = px.line(grouped, x='date', y='Quantity Sold', 
+                          title=f"Daily Sales for {selected_item}")
+        elif time_period == "Weekly":
+            item_data['week'] = item_data['Time/Date'].dt.to_period('W').dt.start_time
+            grouped = item_data.groupby('week')['Quantity Sold'].sum().reset_index()
+            fig = px.line(grouped, x='week', y='Quantity Sold', 
+                          title=f"Weekly Sales for {selected_item}")
+        else:  # Monthly
+            item_data['month'] = item_data['Time/Date'].dt.to_period('M').dt.start_time
+            grouped = item_data.groupby('month')['Quantity Sold'].sum().reset_index()
+            fig = px.line(grouped, x='month', y='Quantity Sold', 
+                          title=f"Monthly Sales for {selected_item}")
+        
         st.plotly_chart(fig, use_container_width=True)
         
-        # Time series of sales
-        st.subheader("Sales Over Time")
-        time_agg = filtered_df.groupby('date')['Quantity Sold'].sum().reset_index()
-        fig = px.line(time_agg, 
-                      x='date', 
-                      y='Quantity Sold',
-                      markers=True)
+        # Hourly heatmap
+        st.subheader("Hourly Demand Patterns")
+        heatmap_data = item_data.groupby(['day_of_week', 'hour'])['Quantity Sold'].mean().reset_index()
+        heatmap_data['day_name'] = heatmap_data['day_of_week'].apply(lambda x: calendar.day_name[x])
+        
+        fig = px.density_heatmap(heatmap_data, x='hour', y='day_name', z='Quantity Sold',
+                                title="Average Demand by Day and Hour",
+                                labels={'hour': 'Hour of Day', 'day_name': 'Day of Week'},
+                                height=500)
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("No data available for selected date range.")
+        st.warning("No historical data available for this item")
 
 with tab3:
-    st.header("Product Recommendations")
+    st.subheader("Smart Recommendations")
     
-    # Create order groups for recommendations
-    df['order_id'] = (df['Time/Date'].diff() > pd.Timedelta('30min')).cumsum()
-    item_matrix = pd.crosstab(df['order_id'], df['Item Name'])
-    co_occurrence = item_matrix.T.dot(item_matrix)
-    np.fill_diagonal(co_occurrence.values, 0)
-    
-    selected_item = st.selectbox(
-        "Select an item to get recommendations",
-        options=df['Item Name'].unique()
-    )
-    
-    if st.button("Get Recommendations"):
-        recommendations = co_occurrence[selected_item].sort_values(ascending=False).head(3).index.tolist()
-        
-        if recommendations:
-            st.subheader(f"Customers who bought {selected_item} also bought:")
-            for i, item in enumerate(recommendations, 1):
-                st.markdown(f"{i}. {item}")
-            
-            # Visualize co-occurrence
-            st.subheader("Item Pair Frequency")
-            top_pairs = co_occurrence[selected_item].sort_values(ascending=False).head(10).reset_index()
-            top_pairs.columns = ['Item', 'Frequency']
-            fig = px.bar(top_pairs, 
-                         x='Item', 
-                         y='Frequency',
-                         color='Frequency',
-                         color_continuous_scale='Greens')
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning(f"No recommendation data available for {selected_item}")
-
-with tab4:
-    st.header("Anomaly Detection")
-    st.info("This section identifies unusual sales patterns in historical data.")
-    
-    # Create daily sales pivot
-    daily_pivot = daily_sales.pivot(index='date', columns='Item Name', values='Quantity Sold').fillna(0)
-    
-    # Detect anomalies
-    from sklearn.ensemble import IsolationForest
-    clf = IsolationForest(contamination=0.05, random_state=42)
-    anomalies = clf.fit_predict(daily_pivot)
-    daily_pivot['anomaly'] = anomalies
-    anomaly_dates = daily_pivot[daily_pivot['anomaly'] == -1].index
-    
-    if not anomaly_dates.empty:
-        st.subheader("Detected Anomalies")
-        st.write(f"Found {len(anomaly_dates)} unusual days in the dataset:")
-        st.dataframe(pd.DataFrame({'Anomaly Dates': anomaly_dates}))
-        
-        st.subheader("Sales with Anomalies Highlighted")
-        fig, ax = plt.subplots(figsize=(12, 6))
-        for item in daily_pivot.columns[:3]:  # Plot first 3 items
-            if item != 'anomaly':
-                ax.plot(daily_pivot.index, daily_pivot[item], label=item)
-        
-        for date in anomaly_dates:
-            ax.axvline(date, color='red', alpha=0.3)
-        
-        ax.set_title('Daily Sales with Anomalies Highlighted')
-        ax.legend()
-        plt.xticks(rotation=45)
-        st.pyplot(fig)
-    else:
-        st.success("No anomalies detected in the dataset.")
-
-# Footer
-st.markdown("---")
-st.markdown("""
-**Food Demand Forecasting** - This application helps predict food demand and optimize inventory management.
-""")
+    # Generate recommendations based on predictions
+    if st.button("Generate Recommendations"):
+        with st.spinner('Analyzing patterns...'):
+            # Recommendation 1: Best selling days
+            item_data = historical_data[historical_data['Item Name'] == selected_item]
+            if len(item_data) > 0:
+                best_day = item_data.groupby('day_of_week')['Quantity Sold'].mean().idxmax()
+                best_day_name = calendar.day_name[best_day]
+                
+                # Recommendation 2: Optimal stock levels
+                avg_demand = item_data['Quantity Sold'].mean()
+                std_demand = item_data['Quantity Sold'].std()
+                recommended_stock = round(avg_demand + std_demand)
+                
+                # Recommendation 3: Best selling time
+                best_hour = item_data.groupby('hour')['Quantity Sold'].mean().idxmax()
+                best_time = f"{best_hour}:00 - {best_hour+1}:00"
+                
+                # Display recommendations
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h3>📅 Best Day</h3>
+                        <p>{best_day_name}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with col2:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h3>🕒 Best Time</h3>
+                        <p>{best_time}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with col3:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h3>📦 Recommended Stock</h3>
+                        <p>{recommended_stock} units</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.warning("Insufficient data for recommendations.")
