@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import SensorData from '../components/watersensor';
 import CanteenPage from '../components/canteen';
+import WaterSensing from '../components/watersensing';
 import {
   collection,
   addDoc,
@@ -379,6 +380,7 @@ export default function ItemsManagement() {
       </Dialog.Root>
       <SensorData />
       <CanteenPage />
+      <WaterSensing />
     </div>
   );
 }
