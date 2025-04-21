@@ -2,8 +2,8 @@
 #include <WiFiClientSecure.h>
 #include <ThingSpeak.h>
 
-const char *ssid = "Vikas";
-const char *password = "12345678";
+const char *ssid = "Deepak";
+const char *password = "qwerty123";
 
 // Firebase settings
 const char *firebaseHost = "smartcanteen-28b15-default-rtdb.asia-southeast1.firebasedatabase.app";
